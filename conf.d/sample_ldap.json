@@ -1,0 +1,6 @@
+{
+    "user": "cn=account,cn=Monitor",
+    "password": "password",
+    "base": "cn=Monitor",
+    "search": "(objectClass=*)"
+}

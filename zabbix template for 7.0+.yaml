@@ -1,0 +1,438 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 57b7ae836ca64446ba2c296389c009b7
+      name: Templates/Modules
+  templates:
+    - uuid: 9575a44d462549e986733a8f0622289f
+      template: '389-DS Status by ExternalCheck'
+      name: '389-DS Status by ExternalCheck'
+      description: |
+        ExternalCheck for 389 directory server with externalscript/ldap_status.py.
+        
+        Check Version: Python 3.11+
+        Require Library: ldap3
+      groups:
+        - name: Templates/Modules
+      items:
+        - uuid: 37d557bbe45c4924b2ed1c49083686e4
+          name: 'status get'
+          type: EXTERNAL
+          key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          history: '0'
+          value_type: TEXT
+          trends: '0'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 7627994c3b1248c597c09122af5537c1
+          name: 'operation: bind'
+          type: DEPENDENT
+          key: 'ldap_status[bindOperations]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: ops
+          description: |
+            sum 4 counter's per sec.
+            anonymousbinds, unauthbinds, simpleauthbinds, strongauthbinds
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[{$LDAP_BIND}][''anonymousbinds'',''unauthbinds'',''simpleauthbinds'',''strongauthbinds''][*].sum()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 5532ddad64454ec384f246e900e6ee7d
+          name: 'connection: current'
+          type: DEPENDENT
+          key: 'ldap_status[currentConnections]'
+          delay: '0'
+          history: 1w
+          trends: 1w
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics.[{$LDAP_BASE}][''connections''].first()'
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 2df941c7f6fd435cba259994b1e51d4f
+          name: resopnse
+          type: DEPENDENT
+          key: 'ldap_status[response]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: s
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.response
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+          triggers:
+            - uuid: 9ab7f77de5744c93a95147e1dcb9c87c
+              expression: 'last(/389-DS Status by ExternalCheck/ldap_status[response])>={$LDA_RESPONSE}'
+              name: 'Response over {$LDAP_RESPONSE} sec.'
+              priority: AVERAGE
+              manual_close: 'YES'
+        - uuid: 8114429a20db4dc58c5e6fa892b33394
+          name: 'operation: search'
+          type: DEPENDENT
+          key: 'ldap_status[searchOperations]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: ops
+          description: |
+            sum 3 counter's per sec.
+            searchops, onelevelsearchops, wholesubtreesearchops
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[{$LDAP_BIND}][''searchops'',''onelevelsearchops'',''wholesubtreesearchops''][*].sum()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 33d59eae67d1403d91e57d684c5d6bb4
+          name: status
+          type: DEPENDENT
+          key: 'ldap_status[status]'
+          delay: '0'
+          history: 1w
+          trends: 1w
+          valuemap:
+            name: 'status code'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+          triggers:
+            - uuid: 180252f5c64b4997b526496e8931ec71
+              expression: 'last(/389-DS Status by ExternalCheck/ldap_status[status])=400'
+              name: 'Bad configuration in {$LDAP_CONFIG}'
+              priority: WARNING
+              description: 'config file: /var/lib/zabbix/conf.d/{$LDAP_CONFIG}.json'
+              manual_close: 'YES'
+            - uuid: 1bf5ab38e45f4710982701604ecdb596
+              expression: 'last(/389-DS Status by ExternalCheck/ldap_status[status])>=500'
+              name: 'Bad Response (code: {ITEM.VALUE})'
+              priority: WARNING
+              description: |
+                500: Failed Connect LDAP
+                501: Failed Processing
+                502: Return Not Success
+              manual_close: 'YES'
+            - uuid: 6a7032e64d5743bcbaae6ec16824f7bb
+              expression: 'nodata(/389-DS Status by ExternalCheck/ldap_status[status],5m)=1'
+              name: 'No data over 5min.'
+              priority: HIGH
+              manual_close: 'YES'
+        - uuid: 610f4831485140368382c4bd76e651ca
+          name: 'connection: throughput'
+          type: DEPENDENT
+          key: 'ldap_status[throughputConnections]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[{$LDAP_BASE}][''connectionseq''].first()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+      macros:
+        - macro: '{$LDAP_BASE}'
+          value: '"cn=snmp,cn=monitor"'
+          description: 'monitor db base, require quotation'
+        - macro: '{$LDAP_PASS}'
+          value: password
+        - macro: '{$LDAP_PORT}'
+          value: '636'
+          description: 'If use specify port number, set parameter with -p option.'
+        - macro: '{$LDAP_RESPONSE}'
+          value: '10'
+        - macro: '{$LDAP_SEARCH}'
+          value: '"(objectClass=*)"'
+          description: 'search objectclass, require quotation'
+        - macro: '{$LDAP_SECURE}'
+          value: 'YES'
+          description: 'YES: over ssl, NO: plain'
+        - macro: '{$LDAP_USER}'
+          value: '"cn=account,cn=monitor"'
+          description: 'enable access monitor db, require quotation'
+      valuemaps:
+        - uuid: b4c8829ae40d4f2585002d2871a60880
+          name: 'status code'
+          mappings:
+            - value: '0'
+              newvalue: OK
+            - value: '400'
+              newvalue: 'Failed Load Config'
+            - value: '500'
+              newvalue: 'Failed Connect LDAP'
+            - value: '501'
+              newvalue: 'Failed Processing'
+            - value: '502'
+              newvalue: 'Return Not Success'
+    - uuid: 7733308d8c8c466bb694835fa008e0a5
+      template: 'OpenLDAP Status by ExternalCheck'
+      name: 'OpenLDAP Status by ExternalCheck'
+      description: |
+        ExternalCheck for OpenLDAP server with externalscript/ldap_status.py.
+        
+        Check Version: Python 3.11+
+        Require Library: ldap3
+      groups:
+        - name: Templates/Modules
+      items:
+        - uuid: 4491b64f405d48c2bc479739135b5ac8
+          name: 'status get'
+          type: EXTERNAL
+          key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          history: '0'
+          value_type: TEXT
+          trends: '0'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 36a8cf2d56434e2787b4f08470085cf5
+          name: 'operation: bind'
+          type: DEPENDENT
+          key: 'ldap_status[bindOperations]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: ops
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[''cn=Bind,cn=Operations,cn=Monitor''][''monitorOpCompleted''].first()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 1eec47ef7bb5469986e262c291b42e66
+          name: 'connection: current'
+          type: DEPENDENT
+          key: 'ldap_status[currentConnections]'
+          delay: '0'
+          history: 1w
+          trends: 1w
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics.[''cn=Current,cn=Connections,cn=Monitor''][''monitorCounter''].first()'
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 8a7c9196c7f646f0a8419ccfcc134aba
+          name: resopnse
+          type: DEPENDENT
+          key: 'ldap_status[response, execute]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: s
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.response
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+          triggers:
+            - uuid: 196ccc86005d4d379a9af0647364b93f
+              expression: 'last(/OpenLDAP Status by ExternalCheck/ldap_status[response, execute])>={$LDA_RESPONSE}'
+              name: 'Response over {$LDAP_RESPONSE} sec.'
+              priority: AVERAGE
+              manual_close: 'YES'
+        - uuid: c30a5f90476341b6b0e1ef86b0ef3d13
+          name: 'operation: search'
+          type: DEPENDENT
+          key: 'ldap_status[searchOperations]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: ops
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[''cn=Search,cn=Operations,cn=Monitor''][''monitorOpCompleted''].first()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: 1d062de1a0b34db8b23a89c8fce4fa8d
+          name: status
+          type: DEPENDENT
+          key: 'ldap_status[status]'
+          delay: '0'
+          history: 1w
+          trends: 1w
+          valuemap:
+            name: 'status code'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.status
+              error_handler: DISCARD_VALUE
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+          triggers:
+            - uuid: a9b108a6c1a340e58635e5a4166a3fbd
+              expression: 'last(/OpenLDAP Status by ExternalCheck/ldap_status[status])=400'
+              name: 'Bad configuration in {$LDAP_CONFIG}'
+              priority: WARNING
+              description: 'config file: /var/lib/zabbix/conf.d/{$LDAP_CONFIG}.json'
+              manual_close: 'YES'
+            - uuid: 10e988e9d06f46178c5fc44916d26a68
+              expression: 'last(/OpenLDAP Status by ExternalCheck/ldap_status[status])>=500'
+              name: 'Bad Response (code: {ITEM.VALUE})'
+              priority: WARNING
+              description: |
+                500: Failed Connect LDAP
+                501: Failed Processing
+                502: Return Not Success
+              manual_close: 'YES'
+            - uuid: af0f63402f824bd49431ec1e44a92adb
+              expression: 'nodata(/OpenLDAP Status by ExternalCheck/ldap_status[status],5m)=1'
+              name: 'No data over 5min.'
+              priority: HIGH
+              manual_close: 'YES'
+        - uuid: 64954937752242009c9679798019d165
+          name: 'connection: throughput'
+          type: DEPENDENT
+          key: 'ldap_status[totalConnections]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[''cn=Total,cn=Connections,cn=Monitor''][''monitorCounter''].first()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+        - uuid: ed2ae4075bca4360b495306bf494ed3b
+          name: 'operation: unbind'
+          type: DEPENDENT
+          key: 'ldap_status[unbindOperations]'
+          delay: '0'
+          history: 1w
+          value_type: FLOAT
+          trends: 1w
+          units: ops
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.metrics[''cn=Unbind,cn=Operations,cn=Monitor''][''monitorOpCompleted''].first()'
+              error_handler: DISCARD_VALUE
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          master_item:
+            key: 'ldap_status.py[{HOST.CONN},-u,{$LDAP_USER},-p,{$LDAP_PASS},-s,{$LDAP_SECURE},--base,{$LDAP_BASE},--search,{$LDAP_SEARCH}]'
+          tags:
+            - tag: Application
+              value: Service.Auth
+      macros:
+        - macro: '{$LDAP_BASE}'
+          value: '"cn=Monitor"'
+          description: 'monitor db base, require quotation'
+        - macro: '{$LDAP_PASS}'
+          value: password
+        - macro: '{$LDAP_PORT}'
+          value: '636'
+          description: 'If use specify port number, set parameter with -p option.'
+        - macro: '{$LDAP_RESPONSE}'
+          value: '10'
+        - macro: '{$LDAP_SEARCH}'
+          value: '"(objectClass=*)"'
+          description: 'search objectclass, require quotation'
+        - macro: '{$LDAP_SECURE}'
+          value: 'YES'
+          description: 'YES: over ssl, NO: plain'
+        - macro: '{$LDAP_USER}'
+          value: '"cn=account,cn=Monitor"'
+          description: 'enable access monitor db, require quotation'
+      valuemaps:
+        - uuid: fd7e6a5387eb42a9aed337651434b20d
+          name: 'status code'
+          mappings:
+            - value: '0'
+              newvalue: OK
+            - value: '400'
+              newvalue: 'Failed Load Config'
+            - value: '500'
+              newvalue: 'Failed Connect LDAP'
+            - value: '501'
+              newvalue: 'Failed Processing'
+            - value: '502'
+              newvalue: 'Return Not Success'
